@@ -1,0 +1,197 @@
+-- Задание 3
+-- Вывести списки групп по заданному направлению с указание номера группы в формате ФИО, бюджет/внебюджет. Студентов выводить в алфавитном порядке.
+
+SELECT Student.fullname AS [Full name],
+       Groups.group_name AS [Group name],
+       CASE WHEN Student.osnova = 1 THEN 'True' ELSE 'False' END AS osnova
+FROM Student
+JOIN Groups ON Groups.id = Student.group_id
+ORDER BY Student.fullname
+
+
+-- Вывести студентов с фамилией, начинающейся с первой буквы вашей фамилии, с указанием ФИО, номера группы и направления обучения.
+
+SELECT Student.fullname AS [Full name],
+       Groups.group_name AS [Group name],
+       Directions_of_study.direction_name AS [direction name]
+FROM Student
+JOIN Groups ON Groups.id = Student.group_id
+JOIN Directions_of_study ON Directions_of_study.id = Groups.direction_id
+WHERE Student.fullname LIKE 'A%';
+
+
+-- Вывести список студентов для поздравления по месяцам в формате Фамилия И.О., день и название месяца рождения, номером группы и направлением обучения.
+
+SELECT 
+    	Student.fullname AS [Full name], 
+    	DAY(Student.birthday) AS [Day], 
+    	DATENAME(MONTH, Student.birthday) AS [Month], 
+    	Groups.group_name AS [Group], 
+    	Directions_of_study.direction_name AS [Direction name]
+FROM Student
+	JOIN Groups ON Student.group_id = Groups.id
+	JOIN Directions_of_study ON Groups.direction_id = Directions_of_study.id
+ORDER BY MONTH(Student.birthday), DAY(Student.birthday);
+
+
+-- Вывести студентов с указанием возраста в годах.
+
+SELECT fullname, DATEDIFF(YEAR, birthday, GETDATE()) AS Age
+FROM Student;
+
+-- Вывести студентов, у которых день рождения в текущем месяце.
+
+SELECT fullname AS [Name], birthday AS [Birthday]
+FROM Student
+WHERE MONTH(Student.birthday) = MONTH(GETDATE());
+
+-- Вывести количество студентов по каждому направлению.
+
+SELECT COUNT(Student.id) AS [Students number], Directions_of_study.direction_name AS [direction name]
+FROM Student
+JOIN Groups ON Groups.id = Student.group_id
+JOIN Directions_of_study ON Directions_of_study.id = Groups.direction_id
+GROUP BY Directions_of_study.direction_name;
+
+
+-- Вывести количество бюджетных и внебюджетных мест по группам. Для каждой группы вывести номер и название направления.
+
+SELECT 
+
+    Groups.group_name AS [Group],
+    Directions_of_study.direction_name AS [Direction name],
+    SUM(CASE WHEN Student.osnova = 1 THEN 1 ELSE 0 END) AS [Budget place],
+    SUM(CASE WHEN Student.osnova = 0 THEN 1 ELSE 0 END) AS [NonBudget place]
+FROM 
+    Student
+JOIN 
+    Groups ON Groups.id = Student.group_id
+JOIN 
+    Directions_of_study ON Directions_of_study.id = Groups.direction_id
+GROUP BY 
+    Groups.id, Groups.group_name, Directions_of_study.direction_name;
+
+
+
+-- Задание 5
+-- Вывести списки групп по каждому предмету с указанием преподавателя.
+
+SELECT Disciplines.name, Groups.group_name, Teachers.name
+FROM Disciplines
+JOIN DirectionDisciplineTeacher ON DirectionDisciplineTeacher.Disciplines_id = Disciplines.id
+JOIN Directions_of_study ON Directions_of_study.id = DirectionDisciplineTeacher.direction_id
+JOIN Groups ON Groups.direction_id = Directions_of_study.id
+JOIN Teachers ON Teachers.id = DirectionDisciplineTeacher.teacher_id;
+
+-- Определить, какую дисциплину изучает максимальное количество студентов.
+
+SELECT Disciplines.name AS [disc_name], COUNT(Student.fullname) AS [s_num]
+FROM Disciplines
+JOIN DirectionDisciplineTeacher ON DirectionDisciplineTeacher.Disciplines_id = Disciplines.id
+JOIN Scores ON Scores.sub_cour_teach_id = DirectionDisciplineTeacher.id
+JOIN Student ON Scores.student_id = Student.id
+GROUP BY Disciplines.name
+ORDER BY COUNT(Student.fullname) DESC 
+OFFSET 0 ROWS FETCH FIRST 1 ROWS ONLY;
+
+-- Определить сколько студентов обучатся у каждого из преподавателей.
+
+SELECT Teachers.name, COUNT(Student.id) AS [s_num]
+FROM Teachers
+JOIN DirectionDisciplineTeacher ON DirectionDisciplineTeacher.teacher_id = Teachers.id
+JOIN Scores ON Scores.sub_cour_teach_id = DirectionDisciplineTeacher.id
+JOIN Student ON Student.id = Scores.student_id
+GROUP BY Teachers.name;
+
+-- Определить долю сдавших студентов по каждой дисциплине (не оценки или 2 считать не сдавшими).
+
+SELECT Disciplines.name AS [disc_name], COUNT(CASE WHEN Scores.mark > 2 THEN 1 END) AS [s_num]
+FROM Disciplines
+JOIN DirectionDisciplineTeacher ON DirectionDisciplineTeacher.Disciplines_id = Disciplines.id
+JOIN Scores ON Scores.sub_cour_teach_id = DirectionDisciplineTeacher.id
+JOIN Student ON Scores.student_id = Student.id
+GROUP BY Disciplines.name
+ORDER BY COUNT(Student.fullname) DESC;
+
+-- Определить среднюю оценку по предметам (для сдавших студентов).
+
+SELECT Disciplines.name AS [disc_name], AVG(CASE WHEN Scores.mark > 2 THEN Scores.mark END) AS [s_avg]
+FROM Disciplines
+JOIN DirectionDisciplineTeacher ON DirectionDisciplineTeacher.Disciplines_id = Disciplines.id
+JOIN Scores ON Scores.sub_cour_teach_id = DirectionDisciplineTeacher.id
+JOIN Student ON Scores.student_id = Student.id
+GROUP BY Disciplines.name
+ORDER BY COUNT(Student.fullname) DESC;
+
+-- Определить группу с максимальной средней оценкой (включая не сдавших).
+
+SELECT Groups.group_name, AVG(Scores.mark) AS [average_mark]
+FROM Groups
+JOIN Directions_of_study ON Directions_of_study.id = Groups.direction_id
+JOIN DirectionDisciplineTeacher ON DirectionDisciplineTeacher.direction_id = Directions_of_study.id
+JOIN Scores ON Scores.sub_cour_teach_id = DirectionDisciplineTeacher.id
+GROUP BY Groups.group_name
+ORDER BY AVG(Scores.mark) DESC
+OFFSET 0 ROWS FETCH FIRST 1 ROWS ONLY;
+
+-- Вывести студентов со всеми оценками отлично и не имеющих несданный экзамен.
+
+SELECT Student.fullname, AVG(Scores.mark)
+FROM Student
+JOIN Scores ON Scores.student_id = Student.id
+GROUP BY Student.fullname
+HAVING AVG(Scores.mark) = 5.0;
+
+-- Вывести кандидатов на отчисление (не сдан не менее двух предметов)
+
+SELECT Student.fullname
+FROM Student
+JOIN Scores ON Scores.student_id = Student.id
+WHERE Scores.mark = 2
+GROUP BY Student.fullname
+HAVING COUNT(*) >= 2;
+
+-- Задание 7
+
+-- Вывести по заданному предмету количество посещенных занятий.
+
+SELECT COUNT(Attendance.id) as num_presence
+FROM Disciplines
+JOIN DirectionDisciplineTeacher ON DirectionDisciplineTeacher.Disciplines_id = Disciplines.id
+JOIN Lessons_shedule ON Lessons_shedule.sub_cour_teach_id = DirectionDisciplineTeacher.id
+JOIN Attendance ON Attendance.tiiming_id = Lessons_shedule.id
+WHERE Disciplines.name = 'Combinatorics' AND Attendance.presense = 1;
+
+-- Вывести по заданному предмету количество пропущенных занятий.
+
+SELECT COUNT(Attendance.id) as num_absence
+FROM Disciplines
+JOIN DirectionDisciplineTeacher ON DirectionDisciplineTeacher.Disciplines_id = Disciplines.id
+JOIN Lessons_shedule ON Lessons_shedule.sub_cour_teach_id = DirectionDisciplineTeacher.id
+JOIN Attendance ON Attendance.tiiming_id = Lessons_shedule.id
+WHERE Disciplines.name = 'Combinatorics' AND Attendance.presense = 0;
+
+-- Вывести по заданному преподавателю количество студентов на каждом занятии.
+
+SELECT COUNT(Attendance.id) as num_students, Lessons_shedule.sub_cour_teach_id
+FROM Teachers
+JOIN DirectionDisciplineTeacher ON DirectionDisciplineTeacher.teacher_id = Teachers.id
+JOIN Lessons_shedule ON Lessons_shedule.sub_cour_teach_id = DirectionDisciplineTeacher.id
+JOIN Attendance ON Attendance.tiiming_id = Lessons_shedule.id
+WHERE Teachers.name = 'Cheglov Yegor Romanovich' AND Attendance.presense = 1
+GROUP BY Lessons_shedule.sub_cour_teach_id;
+
+-- Для каждого студента вывести общее время, потраченное на изучение каждого предмета.
+
+SELECT
+    Student.id AS student_id, Student.fullname AS student_name, Directions_of_study.direction_name AS direction_name, Disciplines.name AS Disciplines_name, 
+    SUM(DATEDIFF(SECOND, Time_to_Pair.time_start, Time_to_Pair.time_end)) AS total_study_time
+FROM Student
+JOIN Groups ON Student.group_id = Groups.id
+JOIN Directions_of_study ON Groups.direction_id = Directions_of_study.id
+JOIN DirectionDisciplineTeacher ON Directions_of_study.id = DirectionDisciplineTeacher.direction_id
+JOIN Disciplines ON DirectionDisciplineTeacher.Disciplines_id = Disciplines.id
+JOIN Lessons_shedule ON DirectionDisciplineTeacher.id = Lessons_shedule.sub_cour_teach_id
+JOIN Time_to_Pair ON Lessons_shedule.time_id = Time_to_Pair.id
+JOIN Attendance ON Lessons_shedule.id = Attendance.tiiming_id AND Student.id = Attendance.student_id AND Attendance.presense = 1
+GROUP BY Student.id, Student.fullname, Directions_of_study.direction_name, Disciplines.name;
